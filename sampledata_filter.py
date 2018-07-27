@@ -7,7 +7,7 @@ import datetime
 import argparse
 
 '''
-Data filtering: de-weighting according to a certain variable
+sampleData filtering: de-weighting according to a certain variable
 '''
 default_ip = "192.168.10.201"
 default_index = "cc-gossip-snmp-4a859fff6e5c4521aab18*"
@@ -46,7 +46,7 @@ page = es.search(
     doc_type=query_type,
     scroll='2m',
     # search_type='',
-    # 过滤取得的数值
+    # set get_size
     size=200,
     body={
         'query': {
