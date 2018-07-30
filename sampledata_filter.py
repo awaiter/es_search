@@ -3,12 +3,16 @@
 
 
 from elasticsearch import Elasticsearch
+import json
 import datetime
 import argparse
 
 '''
-sampleData filtering: de-weighting according to a certain variable
+Data filtering: de-weighting according to a certain variable
+default:
+    get_data from 'now-h' or set by yourself
 '''
+
 default_ip = "192.168.10.201"
 default_index = "cc-gossip-snmp-4a859fff6e5c4521aab18*"
 default_type = "snmp"
@@ -32,8 +36,11 @@ query_index = args.index
 query_type = args.type
 query_key = args.key
 
-filter_yesterday = (datetime.datetime.now() + datetime.timedelta(days=0)).strftime("%Y-%m-%d")
-filter_today = datetime.datetime.now().strftime("%Y-%m-%d")
+# set filter now -N*hours, default N=1
+less_time = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+file_name = "%s_%s.json" % ((datetime.datetime.now() + datetime.timedelta(hours=-1)).strftime("%y%m%d%H%M"),
+                            datetime.datetime.now().strftime("%y%m%d%H%M"))
+greater_time = (datetime.datetime.now() + datetime.timedelta(hours=-1)).strftime("%Y-%m-%dT%H:%M:%S")
 
 es = Elasticsearch([
     {'host': es_host,
@@ -46,15 +53,18 @@ page = es.search(
     doc_type=query_type,
     scroll='2m',
     # search_type='',
-    # set get_size
+    # 过滤取得的数值
     size=200,
     body={
         'query': {
             'range': {
                 '@timestamp': {
                     # 修改时间参数, 后面设置时间
-                    "gt": "{date}T13:00:00||-8h".format(date=filter_today),
-                    "lt": "{date}T13:59:59||-8h".format(date=filter_today),
+                    # "gt": "now-1h"
+                    'gt': "%s||-8h" % greater_time,
+                    'lt': "%s||-8h" % less_time,
+                    # "gt": "{date}T08:30:00||-8h".format(date=filter_date),
+                    # "lt": "{date}T09:30:59||-8h".format(date=filter_date)
                 }
             }
         }
@@ -70,14 +80,15 @@ def filter_key_value(doc_type="snmp", filter_key="MachineIP"):
     return tmp
 
 
-def filter_v3(doc_type="snmp", filter_key="MachineIP"):
+def filter_result(doc_type="snmp", filter_key="MachineIP"):
     tmp = []
     filter_value = []
     for x in page['hits']['hits']:
         if x['_source'][doc_type][filter_key] not in tmp:
             tmp.append(x['_source'][doc_type][filter_key])
-            filter_value.append(x['_source'][doc_type])
+            filter_value.append(x)
     return filter_value
 
 
-print filter_v3(doc_type=query_type, filter_key=query_key)
+with open(file_name, "w") as f:
+    f.write(json.dumps(filter_result(doc_type=query_type, filter_key=query_key), indent=2))
